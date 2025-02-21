@@ -16,7 +16,7 @@ func main() {
 
 	listener, err := net.Listen("tcp", ":50051")
 	if err != nil {
-		ctx.Value("logger").(*zap.Logger).Fatal("Failed to listen", zap.Error(err))
+		logger.GetLogger(ctx).Fatal("Failed to listen", zap.Error(err))
 	}
 
 	db := mapdb.NewMap()
@@ -26,9 +26,9 @@ func main() {
 	grpcServer := grpc.NewServer()
 	pb.RegisterOrderServiceServer(grpcServer, srv)
 
-	ctx.Value("logger").(*zap.Logger).Info("Server started")
+	logger.GetLogger(ctx).Info("Server started")
 
 	if err := grpcServer.Serve(listener); err != nil {
-		ctx.Value("logger").(*zap.Logger).Fatal("Failed to serve", zap.Error(err))
+		logger.GetLogger(ctx).Fatal("Failed to serve", zap.Error(err))
 	}
 }
