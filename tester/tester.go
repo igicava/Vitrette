@@ -1,4 +1,4 @@
-package main
+package tester
 
 import (
 	"context"
@@ -9,7 +9,7 @@ import (
 	pb "lyceum/pkg/api/test/api"
 )
 
-func main() {
+func Tester() {
 	// установим соединение
 	conn, err := grpc.Dial("localhost:50051", grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
