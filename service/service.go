@@ -2,25 +2,38 @@ package service
 
 import (
 	"context"
+	"errors"
 	"github.com/google/uuid"
 	"go.uber.org/zap"
 	pb "lyceum/pkg/api/test/api"
 	"lyceum/pkg/logger"
-	"lyceum/pkg/mapdb"
+	"lyceum/pkg/model"
 )
+
+type DataBaseInterface interface {
+	Create(id string, item string, quantity int32)
+	Get(id string) (model.OrderStruct, error)
+	Update(id string, item string, quantity int32) (model.OrderStruct, error)
+	Delete(id string) error
+	List() []model.OrderStruct
+}
 
 type Service struct {
 	pb.OrderServiceServer
-	DB *mapdb.DataMap
+	DB DataBaseInterface
 }
 
-func NewService(db *mapdb.DataMap) *Service {
+func NewService(db DataBaseInterface) *Service {
 	return &Service{DB: db}
 }
 
 func (s *Service) CreateOrder(ctx context.Context, req *pb.CreateOrderRequest) (*pb.CreateOrderResponse, error) {
 	u := uuid.New()
 	id := u.String()
+	if req.Item == "" || req.Quantity == 0 {
+		logger.GetLogger(ctx).Error("Item and Quantity must not be empty")
+		return nil, errors.New("item and quantity must not be empty")
+	}
 	s.DB.Create(id, req.Item, req.Quantity)
 	return &pb.CreateOrderResponse{Id: id}, nil
 }
@@ -44,6 +57,11 @@ func (s *Service) UpdateOrder(ctx context.Context, req *pb.UpdateOrderRequest) (
 	if err != nil {
 		logger.GetLogger(ctx).Error("GetOrder failed: %v", zap.Error(err))
 		return nil, err
+	}
+
+	if req.Item == "" || req.Quantity == 0 {
+		logger.GetLogger(ctx).Error("Item and Quantity must not be empty")
+		return nil, errors.New("item and quantity must not be empty")
 	}
 
 	item, err := s.DB.Update(req.Id, req.Item, req.Quantity)

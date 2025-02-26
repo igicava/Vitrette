@@ -2,7 +2,7 @@ package mapdb
 
 import (
 	"errors"
-	"lyceum/model"
+	"lyceum/pkg/model"
 	"sync"
 )
 
