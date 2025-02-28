@@ -3,10 +3,10 @@ package main
 import (
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
+	"lyceum/internal/service"
 	pb "lyceum/pkg/api/test/api"
 	"lyceum/pkg/logger"
 	"lyceum/pkg/mapdb"
-	"lyceum/service"
 	"net"
 )
 

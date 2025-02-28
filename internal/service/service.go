@@ -7,15 +7,15 @@ import (
 	"go.uber.org/zap"
 	pb "lyceum/pkg/api/test/api"
 	"lyceum/pkg/logger"
-	"lyceum/pkg/model"
+	// "lyceum/pkg/model"
 )
 
 type DataBaseInterface interface {
 	Create(id string, item string, quantity int32)
-	Get(id string) (model.OrderStruct, error)
-	Update(id string, item string, quantity int32) (model.OrderStruct, error)
+	Get(id string) (*pb.Order, error)
+	Update(id string, item string, quantity int32) (*pb.Order, error)
 	Delete(id string) error
-	List() []model.OrderStruct
+	List() []*pb.Order
 }
 
 type Service struct {
@@ -94,10 +94,6 @@ func (s *Service) DeleteOrder(ctx context.Context, req *pb.DeleteOrderRequest) (
 }
 
 func (s *Service) ListOrders(ctx context.Context, req *pb.ListOrdersRequest) (*pb.ListOrdersResponse, error) {
-	array := s.DB.List()
-	orders := make([]*pb.Order, len(array))
-	for i := range array {
-		orders[i] = &pb.Order{Id: array[i].ID, Item: array[i].Item, Quantity: array[i].Quantity}
-	}
+	orders := s.DB.List()
 	return &pb.ListOrdersResponse{Orders: orders}, nil
 }
