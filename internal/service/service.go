@@ -31,7 +31,7 @@ func (s *Service) CreateOrder(ctx context.Context, req *pb.CreateOrderRequest) (
 	u := uuid.New()
 	id := u.String()
 	if req.Item == "" || req.Quantity == 0 {
-		logger.GetLogger(ctx).Error("Item and Quantity must not be empty")
+		logger.GetLogger(ctx).Error(ctx, "Item and Quantity must not be empty")
 		return nil, errors.New("item and quantity must not be empty")
 	}
 	s.DB.Create(id, req.Item, req.Quantity)
@@ -41,7 +41,7 @@ func (s *Service) CreateOrder(ctx context.Context, req *pb.CreateOrderRequest) (
 func (s *Service) GetOrder(ctx context.Context, req *pb.GetOrderRequest) (*pb.GetOrderResponse, error) {
 	item, err := s.DB.Get(req.Id)
 	if err != nil {
-		logger.GetLogger(ctx).Error("GetOrder failed: %v", zap.Error(err))
+		logger.GetLogger(ctx).Error(ctx, "GetOrder failed: %v", zap.Error(err))
 		return nil, err
 	}
 	order := &pb.Order{
@@ -55,18 +55,18 @@ func (s *Service) GetOrder(ctx context.Context, req *pb.GetOrderRequest) (*pb.Ge
 func (s *Service) UpdateOrder(ctx context.Context, req *pb.UpdateOrderRequest) (*pb.UpdateOrderResponse, error) {
 	_, err := s.DB.Get(req.Id)
 	if err != nil {
-		logger.GetLogger(ctx).Error("GetOrder failed: %v", zap.Error(err))
+		logger.GetLogger(ctx).Error(ctx, "GetOrder failed: %v", zap.Error(err))
 		return nil, err
 	}
 
 	if req.Item == "" || req.Quantity == 0 {
-		logger.GetLogger(ctx).Error("Item and Quantity must not be empty")
+		logger.GetLogger(ctx).Error(ctx, "Item and Quantity must not be empty")
 		return nil, errors.New("item and quantity must not be empty")
 	}
 
 	item, err := s.DB.Update(req.Id, req.Item, req.Quantity)
 	if err != nil {
-		logger.GetLogger(ctx).Error("UpdateOrder failed: %v", zap.Error(err))
+		logger.GetLogger(ctx).Error(ctx, "UpdateOrder failed: %v", zap.Error(err))
 		return nil, err
 	}
 
@@ -82,12 +82,12 @@ func (s *Service) UpdateOrder(ctx context.Context, req *pb.UpdateOrderRequest) (
 func (s *Service) DeleteOrder(ctx context.Context, req *pb.DeleteOrderRequest) (*pb.DeleteOrderResponse, error) {
 	_, err := s.DB.Get(req.Id)
 	if err != nil {
-		logger.GetLogger(ctx).Error("GetOrder failed: %v", zap.Error(err))
+		logger.GetLogger(ctx).Error(ctx, "GetOrder failed: %v", zap.Error(err))
 		return nil, err
 	}
 	err = s.DB.Delete(req.Id)
 	if err != nil {
-		logger.GetLogger(ctx).Error("DeleteOrder failed: %v", zap.Error(err))
+		logger.GetLogger(ctx).Error(ctx, "DeleteOrder failed: %v", zap.Error(err))
 		return nil, err
 	}
 	return &pb.DeleteOrderResponse{Success: true}, nil
