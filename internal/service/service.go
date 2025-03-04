@@ -7,7 +7,7 @@ import (
 	"go.uber.org/zap"
 	pb "lyceum/pkg/api/test/api"
 	"lyceum/pkg/logger"
-	// "lyceum/pkg/model"
+	"os"
 )
 
 type DataBaseInterface interface {
@@ -19,12 +19,13 @@ type DataBaseInterface interface {
 }
 
 type Service struct {
-	pb.OrderServiceServer
-	DB DataBaseInterface
+	pb.UnimplementedOrderServiceServer
+	DB          DataBaseInterface
+	StreamStart chan os.Signal
 }
 
 func NewService(db DataBaseInterface) *Service {
-	return &Service{DB: db}
+	return &Service{DB: db, StreamStart: make(chan os.Signal, 1)}
 }
 
 func (s *Service) CreateOrder(ctx context.Context, req *pb.CreateOrderRequest) (*pb.CreateOrderResponse, error) {
