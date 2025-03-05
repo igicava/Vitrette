@@ -2,7 +2,7 @@ package mapdb
 
 import (
 	"errors"
-	pb "lyceum/pkg/api/test/api"
+	pb "lyceum/pkg/api"
 	"sync"
 )
 

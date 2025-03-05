@@ -5,7 +5,7 @@ import (
 	"errors"
 	"github.com/google/uuid"
 	"go.uber.org/zap"
-	pb "lyceum/pkg/api/test/api"
+	pb "lyceum/pkg/api"
 	"lyceum/pkg/logger"
 	"os"
 )

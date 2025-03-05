@@ -1,11 +1,12 @@
 protoc:
 	go mod tidy &
 	export PATH="$PATH:$(go env GOPATH)/bin" &
-	protoc --go_out=./pkg/api/test \
-		--go_opt=paths=source_relative \
-		--go-grpc_out=./pkg/api/test \
-		--go-grpc_opt=paths=source_relative \
-		./api/*.proto
+	protoc --go_out=. \
+		--go-grpc_out=. \
+		--grpc-gateway_out=. \
+		--grpc-gateway_opt generate_unbound_methods=true \
+		--openapiv2_out . \
+		./api/order.proto
 
 build:
 	go build -o main cmd/main.go

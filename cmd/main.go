@@ -3,12 +3,15 @@ package main
 import (
 	"context"
 	"fmt"
+	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 	"lyceum/internal/config"
 	"lyceum/internal/service"
+	"net/http"
 
-	pb "lyceum/pkg/api/test/api"
+	pb "lyceum/pkg/api"
 	"lyceum/pkg/logger"
 	"lyceum/pkg/mapdb"
 	"net"
@@ -55,8 +58,24 @@ func main() {
 		fmt.Println("Server Stopped")
 	}()
 
+	go runRest(conn, ctx)
 	logger.GetLogger(ctx).Info(ctx, "Starting server...")
 	if err := grpcServer.Serve(listener); err != nil {
 		logger.GetLogger(ctx).Fatal(ctx, "Failed to serve", zap.Error(err))
+	}
+}
+
+func runRest(cfg *config.Config, ctx context.Context) {
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	mux := runtime.NewServeMux()
+	opts := []grpc.DialOption{grpc.WithTransportCredentials(insecure.NewCredentials())}
+	err := pb.RegisterOrderServiceHandlerFromEndpoint(ctx, mux, fmt.Sprintf("localhost:%d", cfg.GRPCPort), opts)
+	if err != nil {
+		panic(err)
+	}
+	logger.GetLogger(ctx).Info(ctx, "Starting server grpc gateway on port 8081...")
+	if err := http.ListenAndServe(":8081", mux); err != nil {
+		logger.GetLogger(ctx).Fatal(ctx, "Failed to serve gateway", zap.Error(err))
 	}
 }
