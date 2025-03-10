@@ -19,6 +19,7 @@ RUN make protoc
 
 RUN make build
 
-EXPOSE 8081 50051
+EXPOSE 8081
+EXPOSE 50051
 
 CMD ["/app/main"]
