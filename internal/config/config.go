@@ -8,7 +8,8 @@ import (
 type Config struct {
 	Postgres postgres.Config `yaml:"POSTGRES" env:"POSTGRES"`
 
-	GRPCPort int `yaml:"GRPC_PORT" env:"GRPC_PORT" env-default:"50051"`
+	GRPCPort    int    `yaml:"GRPC_PORT" env:"GRPC_PORT" env-default:"50051"`
+	GATEWAYPort string `yaml:"GRPC_GATEWAY_PORT" env:"GRPC_GATEWAY_PORT" env-default:"8081"`
 }
 
 func New() (*Config, error) {

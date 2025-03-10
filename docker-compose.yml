@@ -4,21 +4,25 @@ services:
   redis:
     container_name: redis_container_ya
     image: redis:7
-    command: redis-server --requirepass 1234
+    command: redis-server --requirepass ${REDIS_PASSWORD}
     ports:
       - "6379:6379"
     volumes:
       - redis_data:/data/redis
     networks:
       - orders_network
+    env_file:
+      - .env
 
   postgres:
     container_name: postgres_container_ya
     image: postgres:15
     environment:
-      POSTGRES_USER: root
-      POSTGRES_PASSWORD: 1234
-      POSTGRES_DB: postgres
+      - POSTGRES_HOST=${POSTGRES_HOST}
+      - POSTGRES_PORT=${POSTGRES_PORT}
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASS}
+      - POSTGRES_DB=${POSTGRES_DB}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     ports:
@@ -26,6 +30,8 @@ services:
     restart: unless-stopped
     networks:
       - orders_network
+    env_file:
+      - .env
 
   orders:
     container_name: orders_container_ya
@@ -36,20 +42,14 @@ services:
       - "8081:8081"
       - "50051:50051"
     environment:
-      - GRPC_PORT=50051
-      - POSTGRES_HOST=0.0.0.0
-      - POSTGRES_PORT=5432
-      - POSTGRES_USER=root
-      - POSTGRES_PASSWORD=1234
-      - POSTGRES_DB=postgres
-      - REDIS_HOST=redis
-      - REDIS_PORT=6379
-      - REDIS_PASSWORD=1234
+      - GRPC_PORT=${GRPC_PORT}
     depends_on:
       - postgres
       - redis
     networks:
       - orders_network
+    env_file:
+      - .env
 
 volumes:
   postgres_data:

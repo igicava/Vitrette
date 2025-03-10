@@ -74,8 +74,9 @@ func runRest(cfg *config.Config, ctx context.Context) {
 	if err != nil {
 		panic(err)
 	}
-	logger.GetLogger(ctx).Info(ctx, "Starting server grpc gateway on port 8081...")
-	if err := http.ListenAndServe(":8081", mux); err != nil {
+	logger.GetLogger(ctx).Info(ctx, "Starting server grpc gateway...")
+	conn := ":" + cfg.GATEWAYPort
+	if err := http.ListenAndServe(conn, mux); err != nil {
 		logger.GetLogger(ctx).Fatal(ctx, "Failed to serve gateway", zap.Error(err))
 	}
 }
