@@ -9,12 +9,11 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 	"lyceum/internal/config"
 	"lyceum/internal/service"
-	"net/http"
-
 	pb "lyceum/pkg/api"
 	"lyceum/pkg/logger"
 	"lyceum/pkg/mapdb"
 	"net"
+	"net/http"
 	"os/signal"
 	"syscall"
 	"time"
