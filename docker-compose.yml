@@ -1,20 +1,60 @@
-version: '3.5'
+version: '3.8'
 
 services:
+  redis:
+    container_name: redis_container_ya
+    image: redis:7
+    command: redis-server --requirepass 1234
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data/redis
+    networks:
+      - orders_network
+
   postgres:
     container_name: postgres_container_ya
-    image: postgres
+    image: postgres:15
     environment:
       POSTGRES_USER: root
       POSTGRES_PASSWORD: 1234
-      PGDATA: /data/postgres
+      POSTGRES_DB: postgres
     volumes:
-      - postgres:/data/postgres
+      - postgres_data:/var/lib/postgresql/data
     ports:
       - "5432:5432"
     restart: unless-stopped
+    networks:
+      - orders_network
+
+  orders:
+    container_name: orders_container_ya
+    build:
+      dockerfile: ./Dockerfile
+      context: .
+    ports:
+      - "8081:8081"
+      - "50051:50051"
+    environment:
+      - GRPC_PORT=50051
+      - POSTGRES_HOST=0.0.0.0
+      - POSTGRES_PORT=5432
+      - POSTGRES_USER=root
+      - POSTGRES_PASSWORD=1234
+      - POSTGRES_DB=postgres
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_PASSWORD=1234
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - orders_network
 
 volumes:
-  postgres:
+  postgres_data:
+  redis_data:
 
-
+networks:
+  orders_network:
+    driver: bridge

@@ -32,7 +32,7 @@ func main() {
 		logger.GetLogger(ctx).Error(ctx, "config.New() error", zap.Error(err))
 	}
 
-	listener, err := net.Listen("tcp", fmt.Sprintf("localhost:%d", conn.GRPCPort))
+	listener, err := net.Listen("tcp", fmt.Sprintf("0.0.0.0:%d", conn.GRPCPort))
 	if err != nil {
 		logger.GetLogger(ctx).Fatal(ctx, "Failed to listen", zap.Error(err))
 	}
@@ -59,6 +59,7 @@ func main() {
 	}()
 
 	go runRest(conn, ctx)
+
 	logger.GetLogger(ctx).Info(ctx, "Starting server...")
 	if err := grpcServer.Serve(listener); err != nil {
 		logger.GetLogger(ctx).Fatal(ctx, "Failed to serve", zap.Error(err))
@@ -70,7 +71,7 @@ func runRest(cfg *config.Config, ctx context.Context) {
 	defer cancel()
 	mux := runtime.NewServeMux()
 	opts := []grpc.DialOption{grpc.WithTransportCredentials(insecure.NewCredentials())}
-	err := pb.RegisterOrderServiceHandlerFromEndpoint(ctx, mux, fmt.Sprintf("localhost:%d", cfg.GRPCPort), opts)
+	err := pb.RegisterOrderServiceHandlerFromEndpoint(ctx, mux, fmt.Sprintf("0.0.0.0:%d", cfg.GRPCPort), opts)
 	if err != nil {
 		panic(err)
 	}
