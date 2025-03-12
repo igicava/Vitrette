@@ -3,15 +3,19 @@ package main
 import (
 	"context"
 	"fmt"
+
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
+
 	"lyceum/internal/config"
 	"lyceum/internal/service"
 	pb "lyceum/pkg/api"
 	"lyceum/pkg/logger"
 	"lyceum/pkg/mapdb"
+	"lyceum/pkg/postgres"
+
 	"net"
 	"net/http"
 	"os/signal"
@@ -34,6 +38,11 @@ func main() {
 	listener, err := net.Listen("tcp", fmt.Sprintf("0.0.0.0:%d", conn.GRPCPort))
 	if err != nil {
 		logger.GetLogger(ctx).Fatal(ctx, "Failed to listen", zap.Error(err))
+	}
+
+	_, err = postgres.NewPool(ctx, conn.Postgres)
+	if err != nil {
+		logger.GetLogger(ctx).Fatal(ctx, "Failed to connect to postgres", zap.Error(err))
 	}
 
 	db := mapdb.NewMap()
@@ -59,7 +68,7 @@ func main() {
 
 	go runRest(conn, ctx)
 
-	logger.GetLogger(ctx).Info(ctx, "Starting server...")
+	logger.GetLogger(ctx).Info(ctx, "Starting server grpc...", zap.Int("port", conn.GRPCPort))
 	if err := grpcServer.Serve(listener); err != nil {
 		logger.GetLogger(ctx).Fatal(ctx, "Failed to serve", zap.Error(err))
 	}
@@ -74,7 +83,7 @@ func runRest(cfg *config.Config, ctx context.Context) {
 	if err != nil {
 		panic(err)
 	}
-	logger.GetLogger(ctx).Info(ctx, "Starting server grpc gateway...")
+	logger.GetLogger(ctx).Info(ctx, "Starting server grpc gateway...", zap.String("port", cfg.GATEWAYPort))
 	conn := ":" + cfg.GATEWAYPort
 	if err := http.ListenAndServe(conn, mux); err != nil {
 		logger.GetLogger(ctx).Fatal(ctx, "Failed to serve gateway", zap.Error(err))
