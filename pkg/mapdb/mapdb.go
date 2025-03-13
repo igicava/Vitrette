@@ -1,6 +1,7 @@
 package mapdb
 
 import (
+	"context"
 	"errors"
 	pb "lyceum/pkg/api"
 	"sync"
@@ -15,7 +16,7 @@ func NewMap() *DataMap {
 	return &DataMap{data: make(map[string]*pb.Order), mu: sync.RWMutex{}}
 }
 
-func (s *DataMap) Create(id string, item string, quantity int32) {
+func (s *DataMap) Create(ctx context.Context, id string, item string, quantity int32) {
 	itemObject := pb.Order{
 		Item:     item,
 		Quantity: quantity,
@@ -26,7 +27,7 @@ func (s *DataMap) Create(id string, item string, quantity int32) {
 	s.mu.Unlock()
 }
 
-func (s *DataMap) Get(id string) (*pb.Order, error) {
+func (s *DataMap) Get(ctx context.Context, id string) (*pb.Order, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	itemObject, ok := s.data[id]
@@ -36,8 +37,8 @@ func (s *DataMap) Get(id string) (*pb.Order, error) {
 	return itemObject, nil
 }
 
-func (s *DataMap) Update(id string, item string, quantity int32) (*pb.Order, error) {
-	itemObject, err := s.Get(id)
+func (s *DataMap) Update(ctx context.Context, id string, item string, quantity int32) (*pb.Order, error) {
+	itemObject, err := s.Get(ctx, id)
 	if err != nil {
 		return &pb.Order{}, errors.New("item not found")
 	}
@@ -51,8 +52,8 @@ func (s *DataMap) Update(id string, item string, quantity int32) (*pb.Order, err
 	return s.data[id], nil
 }
 
-func (s *DataMap) Delete(id string) error {
-	_, err := s.Get(id)
+func (s *DataMap) Delete(ctx context.Context, id string) error {
+	_, err := s.Get(ctx, id)
 	if err != nil {
 		return errors.New("item not found")
 	}
@@ -62,7 +63,7 @@ func (s *DataMap) Delete(id string) error {
 	return nil
 }
 
-func (s *DataMap) List() []*pb.Order {
+func (s *DataMap) List(ctx context.Context) []*pb.Order {
 	var array []*pb.Order
 	s.mu.RLock()
 	for _, itemObject := range s.data {

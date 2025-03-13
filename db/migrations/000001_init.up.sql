@@ -1,12 +1,7 @@
--- Создание схемы, если она не существует
-CREATE SCHEMA IF NOT EXISTS schema_name;
+create schema if not exists lyceum_schema;
 
-BEGIN;
--- Создание таблицы внутри схемы
-CREATE TABLE schema_name.orders (
-                                    id serial not null,
-                                    item serial not null,
-                                    quantity serial not null
-);
-
-COMMIT;
+create table if not exists lyceum_schema.orders (
+    id text not null,
+    item text not null,
+    quantity bigserial not null
+)

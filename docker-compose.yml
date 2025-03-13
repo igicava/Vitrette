@@ -3,12 +3,17 @@ version: '3.8'
 services:
   redis:
     container_name: redis_container_ya
-    image: redis
+    image: redis:7-bookworm
     command: redis-server --requirepass ${REDIS_PASSWORD}
     ports:
       - "6379:6379"
     volumes:
-      - redis_data:/data/7/redis
+      - redis_data:/data/bookworm/redis
+    healthcheck:
+      test: [ "CMD", "redis-cli", "-a", "$REDIS_PASSWORD", "ping" ]
+      interval: 1s
+      timeout: 5s
+      retries: 10
     networks:
       - orders_network
     env_file:
@@ -16,7 +21,7 @@ services:
 
   postgres:
     container_name: postgres_container_ya
-    image: postgres
+    image: postgres:17-bookworm
     environment:
       - POSTGRES_HOST=${POSTGRES_HOST}
       - POSTGRES_PORT=${POSTGRES_PORT}
@@ -24,10 +29,15 @@ services:
       - POSTGRES_PASSWORD=${POSTGRES_PASS}
       - POSTGRES_DB=${POSTGRES_DB}
     volumes:
-      - postgres_data:/var/lib/postgresql/17/data
+      - postgres_data:/data/bookworm/postgres
     ports:
       - "5432:5432"
     restart: unless-stopped
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -d ${POSTGRES_DB} -U ${POSTGRES_USER}"]
+      interval: 1s
+      timeout: 5s
+      retries: 10
     networks:
       - orders_network
     env_file:
@@ -44,8 +54,10 @@ services:
     environment:
       - GRPC_PORT=${GRPC_PORT}
     depends_on:
-      - postgres
-      - redis
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     networks:
       - orders_network
     env_file:

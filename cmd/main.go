@@ -13,7 +13,6 @@ import (
 	"lyceum/internal/service"
 	pb "lyceum/pkg/api"
 	"lyceum/pkg/logger"
-	"lyceum/pkg/mapdb"
 	"lyceum/pkg/postgres"
 
 	"net"
@@ -40,12 +39,12 @@ func main() {
 		logger.GetLogger(ctx).Fatal(ctx, "Failed to listen", zap.Error(err))
 	}
 
-	_, err = postgres.NewPool(ctx, conn.Postgres)
+	pool, err := postgres.NewPool(ctx, conn.Postgres)
 	if err != nil {
 		logger.GetLogger(ctx).Fatal(ctx, "Failed to connect to postgres", zap.Error(err))
 	}
 
-	db := mapdb.NewMap()
+	db := postgres.NewPG(pool)
 
 	srv := service.NewService(db)
 
