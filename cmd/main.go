@@ -9,6 +9,8 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 
+	"github.com/go-redis/redis"
+
 	"lyceum/internal/config"
 	"lyceum/internal/service"
 	pb "lyceum/pkg/api"
@@ -46,7 +48,13 @@ func main() {
 
 	db := postgres.NewPG(pool)
 
-	srv := service.NewService(db)
+	redisClient := redis.NewClient(&redis.Options{
+		Addr:     fmt.Sprintf("localhost:%s", conn.Redis.Port),
+		Password: conn.Redis.Password,
+		DB:       conn.Redis.DB,
+	})
+
+	srv := service.NewService(db, *redisClient)
 
 	grpcServer := grpc.NewServer(grpc.UnaryInterceptor(logger.Interceptor))
 	pb.RegisterOrderServiceServer(grpcServer, srv)

@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"errors"
+	"github.com/go-redis/redis"
 	"github.com/google/uuid"
 	"go.uber.org/zap"
 	pb "lyceum/pkg/api"
@@ -21,11 +22,16 @@ type DataBaseInterface interface {
 type Service struct {
 	pb.UnimplementedOrderServiceServer
 	DB          DataBaseInterface
+	Redis       *redis.Client
 	StreamStart chan os.Signal
 }
 
-func NewService(db DataBaseInterface) *Service {
-	return &Service{DB: db, StreamStart: make(chan os.Signal, 1)}
+func NewService(db DataBaseInterface, client redis.Client) *Service {
+	return &Service{
+		DB:          db,
+		Redis:       &client,
+		StreamStart: make(chan os.Signal, 1),
+	}
 }
 
 func (s *Service) CreateOrder(ctx context.Context, req *pb.CreateOrderRequest) (*pb.CreateOrderResponse, error) {
