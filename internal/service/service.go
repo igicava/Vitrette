@@ -2,13 +2,16 @@ package service
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
-	"github.com/go-redis/redis"
+	"fmt"
 	"github.com/google/uuid"
+	"github.com/redis/go-redis/v9"
 	"go.uber.org/zap"
 	pb "lyceum/pkg/api"
 	"lyceum/pkg/logger"
 	"os"
+	"time"
 )
 
 type DataBaseInterface interface {
@@ -46,17 +49,38 @@ func (s *Service) CreateOrder(ctx context.Context, req *pb.CreateOrderRequest) (
 }
 
 func (s *Service) GetOrder(ctx context.Context, req *pb.GetOrderRequest) (*pb.GetOrderResponse, error) {
-	item, err := s.DB.Get(ctx, req.Id)
+	str, err := s.Redis.Get(ctx, req.Id).Result()
+
+	if errors.Is(err, redis.Nil) {
+		item, err := s.DB.Get(ctx, req.Id)
+		if err != nil {
+			logger.GetLogger(ctx).Error(ctx, "GetOrder failed: %v", zap.Error(err))
+			return nil, err
+		}
+
+		order := &pb.Order{
+			Id:       req.Id,
+			Item:     item.Item,
+			Quantity: item.Quantity,
+		}
+
+		str, _ := json.Marshal(order)
+		err = s.Redis.Set(ctx, req.Id, string(str), time.Minute).Err()
+		if err != nil {
+			logger.GetLogger(ctx).Error(ctx, "SetCacheOrder failed: %v", zap.Error(err))
+		}
+
+		return &pb.GetOrderResponse{Order: order}, nil
+	}
+
+	fmt.Println("Value from cache!")
+	orderFromCache := pb.Order{}
+	err = json.Unmarshal([]byte(str), &orderFromCache)
 	if err != nil {
-		logger.GetLogger(ctx).Error(ctx, "GetOrder failed: %v", zap.Error(err))
+		logger.GetLogger(ctx).Error(ctx, "Unmarshal order failed: %v", zap.Error(err))
 		return nil, err
 	}
-	order := &pb.Order{
-		Id:       req.Id,
-		Item:     item.Item,
-		Quantity: item.Quantity,
-	}
-	return &pb.GetOrderResponse{Order: order}, nil
+	return &pb.GetOrderResponse{Order: &orderFromCache}, nil
 }
 
 func (s *Service) UpdateOrder(ctx context.Context, req *pb.UpdateOrderRequest) (*pb.UpdateOrderResponse, error) {
@@ -81,6 +105,13 @@ func (s *Service) UpdateOrder(ctx context.Context, req *pb.UpdateOrderRequest) (
 		Id:       req.Id,
 		Item:     item.Item,
 		Quantity: item.Quantity,
+	}
+
+	str, _ := json.Marshal(order)
+	err = s.Redis.Set(ctx, req.Id, string(str), time.Minute).Err()
+	if err != nil {
+		logger.GetLogger(ctx).Error(ctx, "SetOrder failed: %v", zap.Error(err))
+		return nil, err
 	}
 
 	return &pb.UpdateOrderResponse{Order: order}, nil

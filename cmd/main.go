@@ -9,7 +9,7 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 
-	"github.com/go-redis/redis"
+	"github.com/redis/go-redis/v9"
 
 	"lyceum/internal/config"
 	"lyceum/internal/service"
@@ -49,7 +49,7 @@ func main() {
 	db := postgres.NewPG(pool)
 
 	redisClient := redis.NewClient(&redis.Options{
-		Addr:     fmt.Sprintf("localhost:%s", conn.Redis.Port),
+		Addr:     fmt.Sprintf("redis:%s", conn.Redis.Port),
 		Password: conn.Redis.Password,
 		DB:       conn.Redis.DB,
 	})

@@ -40,6 +40,7 @@ func (p *PG) Get(ctx context.Context, id string) (*pb.Order, error) {
 	row := p.Pool.QueryRow(ctx, "SELECT id, item, quantity FROM lyceum_schema.orders WHERE id = $1", id)
 	if err := row.Scan(&order.Id, &order.Item, &order.Quantity); err != nil {
 		logger.GetLogger(ctx).Error(ctx, "Error get order", zap.Error(err))
+		return nil, err
 	}
 	return order, nil
 }
