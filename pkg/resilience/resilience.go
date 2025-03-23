@@ -7,6 +7,7 @@ import (
 	"time"
 )
 
+// Retry function retries the operation function maxRetries times with an exponential backoff (pattern: retry pattern)
 func Retry(operation func() error, maxRetries int, baseDelay time.Duration) error {
 	var err error
 	for n := 1; n <= maxRetries; n++ {
@@ -21,6 +22,7 @@ func Retry(operation func() error, maxRetries int, baseDelay time.Duration) erro
 	return err
 }
 
+// Timeout function executes the operation function with a timeout (pattern: timeout pattern)
 func Timeout(operation func() error, timeout time.Duration) error {
 	errChan := make(chan error, 1)
 
@@ -40,6 +42,7 @@ func Timeout(operation func() error, timeout time.Duration) error {
 	}
 }
 
+// ProcessWithDLQ function for dead letter queue pattern
 func ProcessWithDLQ(messages []string,
 	operation func(msg string) error,
 	dlq *[]string,
