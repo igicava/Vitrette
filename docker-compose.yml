@@ -43,8 +43,22 @@ services:
     env_file:
       - .env
 
-  orders:
-    container_name: orders_container_ya
+  nginx:
+    container_name: nginx
+    image: nginx:1.27
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx:/etc/nginx/conf.d/
+    depends_on:
+      - orders1
+      - orders2
+      - orders3
+    networks:
+      - orders_network
+
+  orders1:
+    container_name: orders_container_ya1
     build:
       dockerfile: ./Dockerfile
       context: .
@@ -58,6 +72,52 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+    networks:
+      - orders_network
+    env_file:
+      - .env
+
+  orders2:
+    container_name: orders_container_ya2
+    build:
+      dockerfile: ./Dockerfile
+      context: .
+    ports:
+      - "8082:8081"
+      - "50052:50051"
+    environment:
+      - GRPC_PORT=${GRPC_PORT}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      orders1:
+        condition: service_started
+    networks:
+      - orders_network
+    env_file:
+      - .env
+
+  orders3:
+    container_name: orders_container_ya3
+    build:
+      dockerfile: ./Dockerfile
+      context: .
+    ports:
+      - "8083:8081"
+      - "50053:50051"
+    environment:
+      - GRPC_PORT=${GRPC_PORT}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      orders1:
+        condition: service_started
+      orders2:
+        condition: service_started
     networks:
       - orders_network
     env_file:
