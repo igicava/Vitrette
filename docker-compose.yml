@@ -19,6 +19,88 @@ services:
     env_file:
       - .env
 
+  elasticsearch:
+    container_name: elasticsearch_container_ya
+    image: elasticsearch:8.17.4
+    ports:
+      - "${ELASTICSEARCH_PORT}:${ELASTICSEARCH_PORT}"
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - ES_JAVA_OPTS=-Xms1g -Xmx1g
+    networks:
+      - orders_network
+    healthcheck:
+      interval: 10s
+      retries: 80
+      test: curl --write-out 'HTTP %{http_code}' --fail --silent --output /dev/null http://localhost:${ELASTICSEARCH_PORT}/
+    env_file:
+      - .env
+
+  kafka-connect:
+    container_name: kafka-connect_container_ya
+    image: confluentinc/cp-kafka-connect:7.4.0
+    depends_on:
+      kafka:
+        condition: service_healthy
+    ports:
+      - "8083:8083"
+    environment:
+        CONNECT_BOOTSTRAP_SERVERS: kafka:9092
+        CONNECT_REST_ADVERTISED_HOST_NAME: kafka-connect
+        CONNECT_REST_PORT: 8083
+        CONNECT_GROUP_ID: compose-connect-group
+        CONNECT_CONFIG_STORAGE_TOPIC: docker-connect-configs
+        CONNECT_CONFIG_STORAGE_REPLICATION_FACTOR: 1
+        CONNECT_OFFSET_STORAGE_TOPIC: docker-connect-offsets
+        CONNECT_OFFSET_STORAGE_REPLICATION_FACTOR: 1
+        CONNECT_STATUS_STORAGE_TOPIC: docker-connect-status
+        CONNECT_STATUS_STORAGE_REPLICATION_FACTOR: 1
+        CONNECT_KEY_CONVERTER: org.apache.kafka.connect.json.JsonConverter
+        CONNECT_VALUE_CONVERTER: org.apache.kafka.connect.json.JsonConverter
+        CONNECT_PLUGIN_PATH: "/usr/share/java,/usr/share/confluent-hub-components"
+    volumes:
+      - ./connectors/elasticsearch-connector:/tmp/elasticsearch-connector
+    networks:
+      - orders_network
+
+  zookeeper:
+    container_name: zookeeper_container_ya
+    image: confluentinc/cp-zookeeper:7.4.0
+    ports:
+      - "${ZOOKEEPER_CLIENT_PORT}:${ZOOKEEPER_CLIENT_PORT}"
+    environment:
+      - ZOOKEEPER_CLIENT_PORT=${ZOOKEEPER_CLIENT_PORT}
+      - ZOOKEEPER_TICK_TIME=${ZOOKEEPER_TICK_TIME}
+    env_file:
+      - .env
+    networks:
+      - orders_network
+
+  kafka:
+    container_name: kafka_container_ya
+    image: confluentinc/cp-kafka:7.4.0
+    ports:
+      - "${KAFKA_LISTENER_PLAIN_PORT}:${KAFKA_LISTENER_PLAIN_PORT}"
+    environment:
+      - KAFKA_BROKER_ID=${KAFKA_BROKER_ID}
+      - KAFKA_LISTENER_NAME=${KAFKA_LISTENER_NAME}
+      - KAFKA_ZOOKEEPER_CONNECT=${KAFKA_ZOOKEEPER_CONNECT}
+      - KAFKA_LISTENER_PLAIN_PORT=${KAFKA_LISTENER_PLAIN_PORT}
+      - KAFKA_ADVERTISED_LISTENERS=${KAFKA_ADVERTISED_LISTENERS}
+      - KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR=${KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR}
+    healthcheck:
+      test: [ "CMD", "kafka-topics", "--bootstrap-server", "localhost:${KAFKA_LISTENER_PLAIN_PORT}", "--list" ]
+      interval: 1s
+      timeout: 5s
+      retries: 10
+    depends_on:
+      - zookeeper
+    env_file:
+      - .env
+    networks:
+      - orders_network
+
   postgres:
     container_name: postgres_container_ya
     image: postgres:17-bookworm
@@ -72,6 +154,10 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      kafka:
+        condition: service_healthy
+      elasticsearch:
+        condition: service_healthy
     networks:
       - orders_network
     env_file:
@@ -83,7 +169,6 @@ services:
       dockerfile: ./Dockerfile
       context: .
     ports:
-      - "8082:8081"
       - "50052:50051"
     environment:
       - GRPC_PORT=${GRPC_PORT}
@@ -91,6 +176,10 @@ services:
       postgres:
         condition: service_healthy
       redis:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      elasticsearch:
         condition: service_healthy
       orders1:
         condition: service_started
@@ -105,7 +194,6 @@ services:
       dockerfile: ./Dockerfile
       context: .
     ports:
-      - "8083:8081"
       - "50053:50051"
     environment:
       - GRPC_PORT=${GRPC_PORT}
@@ -113,6 +201,10 @@ services:
       postgres:
         condition: service_healthy
       redis:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      elasticsearch:
         condition: service_healthy
       orders1:
         condition: service_started
@@ -126,6 +218,8 @@ services:
 volumes:
   postgres_data:
   redis_data:
+  esdata:
+    driver: local
 
 networks:
   orders_network:

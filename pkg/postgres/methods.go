@@ -16,23 +16,20 @@ func NewPG(p *pgxpool.Pool) *PG {
 	return &PG{p}
 }
 
-func (p *PG) Create(ctx context.Context, id string, item string, quantity int32) {
+func (p *PG) Create(ctx context.Context, id string, item string, quantity int32) error {
 	tx, err := p.Pool.Begin(ctx)
 	if err != nil {
-		logger.GetLogger(ctx).Error(ctx, "PG Begin Error", zap.Error(err))
-		return
+		return err
 	}
 	_, err = p.Exec(ctx, "INSERT INTO lyceum_schema.orders (id, item, quantity) VALUES ($1, $2, $3)", id, item, quantity)
 	if err != nil {
-		logger.GetLogger(ctx).Error(ctx, "Error create order", zap.Error(err))
-		return
+		return err
 	}
 	err = tx.Commit(ctx)
 	if err != nil {
-		logger.GetLogger(ctx).Error(ctx, "Error commit order", zap.Error(err))
-		return
+		return err
 	}
-
+	return nil
 }
 
 func (p *PG) Get(ctx context.Context, id string) (*pb.Order, error) {
@@ -85,21 +82,20 @@ func (p *PG) Delete(ctx context.Context, id string) error {
 	return nil
 }
 
-func (p *PG) List(ctx context.Context) []*pb.Order {
+func (p *PG) List(ctx context.Context) ([]*pb.Order, error) {
 	var orders []*pb.Order
 	r, err := p.Pool.Query(ctx, "SELECT id, item, quantity FROM lyceum_schema.orders")
 	if err != nil {
-		logger.GetLogger(ctx).Error(ctx, "PG Query Error", zap.Error(err))
-		return orders
+		return orders, err
 	}
 	defer r.Close()
 	for r.Next() {
 		order := &pb.Order{}
 		err = r.Scan(&order.Id, &order.Item, &order.Quantity)
 		if err != nil {
-			logger.GetLogger(ctx).Error(ctx, "PG Scan Error", zap.Error(err))
+			return nil, err
 		}
 		orders = append(orders, order)
 	}
-	return orders
+	return orders, nil
 }

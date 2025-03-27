@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/IBM/sarama"
+	"github.com/elastic/go-elasticsearch/v8"
 	"github.com/google/uuid"
 	"github.com/redis/go-redis/v9"
 	"go.uber.org/zap"
@@ -15,25 +17,29 @@ import (
 )
 
 type DataBaseInterface interface {
-	Create(ctx context.Context, id string, item string, quantity int32)
+	Create(ctx context.Context, id string, item string, quantity int32) error
 	Get(ctx context.Context, id string) (*pb.Order, error)
 	Update(ctx context.Context, id string, item string, quantity int32) (*pb.Order, error)
 	Delete(ctx context.Context, id string) error
-	List(ctx context.Context) []*pb.Order
+	List(ctx context.Context) ([]*pb.Order, error)
 }
 
 type Service struct {
 	pb.UnimplementedOrderServiceServer
-	DB          DataBaseInterface
-	Redis       *redis.Client
-	StreamStart chan os.Signal
+	DB            DataBaseInterface
+	Redis         *redis.Client
+	KafkaProducer sarama.SyncProducer
+	es            *elasticsearch.Client
+	StreamStart   chan os.Signal
 }
 
-func NewService(db DataBaseInterface, client redis.Client) *Service {
+func NewService(db DataBaseInterface, client redis.Client, producer sarama.SyncProducer, es *elasticsearch.Client) *Service {
 	return &Service{
-		DB:          db,
-		Redis:       &client,
-		StreamStart: make(chan os.Signal, 1),
+		DB:            db,
+		Redis:         &client,
+		KafkaProducer: producer,
+		es:            es,
+		StreamStart:   make(chan os.Signal, 1),
 	}
 }
 
@@ -44,7 +50,21 @@ func (s *Service) CreateOrder(ctx context.Context, req *pb.CreateOrderRequest) (
 		logger.GetLogger(ctx).Error(ctx, "Item and Quantity must not be empty")
 		return nil, errors.New("item and quantity must not be empty")
 	}
-	s.DB.Create(ctx, id, req.Item, req.Quantity)
+	err := s.DB.Create(ctx, id, req.Item, req.Quantity)
+	if err != nil {
+		logger.GetLogger(ctx).Error(ctx, "CreateOrder failed", zap.Error(err))
+		return nil, err
+	}
+	order, _ := json.Marshal(&pb.Order{
+		Id:       id,
+		Item:     req.Item,
+		Quantity: req.Quantity,
+	})
+	_, _, err = s.KafkaProducer.SendMessage(&sarama.ProducerMessage{
+		Topic: "orders",
+		Key:   sarama.StringEncoder(id),
+		Value: sarama.StringEncoder(order),
+	})
 	return &pb.CreateOrderResponse{Id: id}, nil
 }
 
@@ -52,9 +72,15 @@ func (s *Service) GetOrder(ctx context.Context, req *pb.GetOrderRequest) (*pb.Ge
 	str, err := s.Redis.Get(ctx, req.Id).Result()
 
 	if errors.Is(err, redis.Nil) {
+		esItem, err := s.es.Get("orders", req.Id)
+		if err != nil {
+			logger.GetLogger(ctx).Error(ctx, "GetOrder failed", zap.Error(err))
+			// return nil, err
+		}
+		fmt.Printf("%s", esItem)
 		item, err := s.DB.Get(ctx, req.Id)
 		if err != nil {
-			logger.GetLogger(ctx).Error(ctx, "GetOrder failed: %v", zap.Error(err))
+			logger.GetLogger(ctx).Error(ctx, "GetOrder failed", zap.Error(err))
 			return nil, err
 		}
 
@@ -67,9 +93,9 @@ func (s *Service) GetOrder(ctx context.Context, req *pb.GetOrderRequest) (*pb.Ge
 		str, _ := json.Marshal(order)
 		err = s.Redis.Set(ctx, req.Id, string(str), time.Minute).Err()
 		if err != nil {
-			logger.GetLogger(ctx).Error(ctx, "SetCacheOrder failed: %v", zap.Error(err))
+			logger.GetLogger(ctx).Error(ctx, "SetCacheOrder failed", zap.Error(err))
 		}
-
+		fmt.Println("Value from db!")
 		return &pb.GetOrderResponse{Order: order}, nil
 	}
 
@@ -77,7 +103,7 @@ func (s *Service) GetOrder(ctx context.Context, req *pb.GetOrderRequest) (*pb.Ge
 	orderFromCache := pb.Order{}
 	err = json.Unmarshal([]byte(str), &orderFromCache)
 	if err != nil {
-		logger.GetLogger(ctx).Error(ctx, "Unmarshal order failed: %v", zap.Error(err))
+		logger.GetLogger(ctx).Error(ctx, "Unmarshal order failed", zap.Error(err))
 		return nil, err
 	}
 	return &pb.GetOrderResponse{Order: &orderFromCache}, nil
@@ -86,7 +112,7 @@ func (s *Service) GetOrder(ctx context.Context, req *pb.GetOrderRequest) (*pb.Ge
 func (s *Service) UpdateOrder(ctx context.Context, req *pb.UpdateOrderRequest) (*pb.UpdateOrderResponse, error) {
 	_, err := s.DB.Get(ctx, req.Id)
 	if err != nil {
-		logger.GetLogger(ctx).Error(ctx, "GetOrder failed: %v", zap.Error(err))
+		logger.GetLogger(ctx).Error(ctx, "GetOrder failed", zap.Error(err))
 		return nil, err
 	}
 
@@ -97,9 +123,15 @@ func (s *Service) UpdateOrder(ctx context.Context, req *pb.UpdateOrderRequest) (
 
 	item, err := s.DB.Update(ctx, req.Id, req.Item, req.Quantity)
 	if err != nil {
-		logger.GetLogger(ctx).Error(ctx, "UpdateOrder failed: %v", zap.Error(err))
+		logger.GetLogger(ctx).Error(ctx, "UpdateOrder failed", zap.Error(err))
 		return nil, err
 	}
+
+	_, _, err = s.KafkaProducer.SendMessage(&sarama.ProducerMessage{
+		Topic: "orders",
+		Key:   sarama.StringEncoder(req.Id),
+		Value: sarama.StringEncoder(req.Item),
+	})
 
 	order := &pb.Order{
 		Id:       req.Id,
@@ -110,7 +142,7 @@ func (s *Service) UpdateOrder(ctx context.Context, req *pb.UpdateOrderRequest) (
 	str, _ := json.Marshal(order)
 	err = s.Redis.Set(ctx, req.Id, string(str), time.Minute).Err()
 	if err != nil {
-		logger.GetLogger(ctx).Error(ctx, "SetOrder failed: %v", zap.Error(err))
+		logger.GetLogger(ctx).Error(ctx, "SetOrder failed", zap.Error(err))
 		return nil, err
 	}
 
@@ -120,12 +152,12 @@ func (s *Service) UpdateOrder(ctx context.Context, req *pb.UpdateOrderRequest) (
 func (s *Service) DeleteOrder(ctx context.Context, req *pb.DeleteOrderRequest) (*pb.DeleteOrderResponse, error) {
 	_, err := s.DB.Get(ctx, req.Id)
 	if err != nil {
-		logger.GetLogger(ctx).Error(ctx, "GetOrder failed: %v", zap.Error(err))
+		logger.GetLogger(ctx).Error(ctx, "GetOrder failed", zap.Error(err))
 		return nil, err
 	}
 	err = s.DB.Delete(ctx, req.Id)
 	if err != nil {
-		logger.GetLogger(ctx).Error(ctx, "DeleteOrder failed: %v", zap.Error(err))
+		logger.GetLogger(ctx).Error(ctx, "DeleteOrder failed", zap.Error(err))
 		return nil, err
 	}
 	err = s.Redis.Del(ctx, req.Id).Err()
@@ -136,6 +168,10 @@ func (s *Service) DeleteOrder(ctx context.Context, req *pb.DeleteOrderRequest) (
 }
 
 func (s *Service) ListOrders(ctx context.Context, req *pb.ListOrdersRequest) (*pb.ListOrdersResponse, error) {
-	orders := s.DB.List(ctx)
+	orders, err := s.DB.List(ctx)
+	if err != nil {
+		logger.GetLogger(ctx).Error(ctx, "ListOrders failed", zap.Error(err))
+		return nil, err
+	}
 	return &pb.ListOrdersResponse{Orders: orders}, nil
 }

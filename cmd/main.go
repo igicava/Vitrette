@@ -3,14 +3,13 @@ package main
 import (
 	"context"
 	"fmt"
-
+	"github.com/IBM/sarama"
+	"github.com/elastic/go-elasticsearch/v8"
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
+	"github.com/redis/go-redis/v9"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
-
-	"github.com/redis/go-redis/v9"
-
 	"lyceum/internal/config"
 	"lyceum/internal/service"
 	pb "lyceum/pkg/api"
@@ -54,7 +53,31 @@ func main() {
 		DB:       conn.Redis.DB,
 	})
 
-	srv := service.NewService(db, *redisClient)
+	kafkaConfig := sarama.NewConfig()
+	kafkaConfig.Producer.Return.Successes = true
+	producer, err := sarama.NewSyncProducer(
+		[]string{fmt.Sprintf("kafka:%s", conn.Kafka.Port)},
+		kafkaConfig,
+	)
+	if err != nil {
+		logger.GetLogger(ctx).Fatal(ctx, "Failed to connect to kafka", zap.Error(err))
+	}
+	defer producer.Close()
+
+	es, err := elasticsearch.NewDefaultClient()
+	if err != nil {
+		logger.GetLogger(ctx).Fatal(ctx, "Failed to connect to elasticsearch", zap.Error(err))
+	}
+
+	go func() {
+		res, err := es.Info()
+		if err != nil {
+			logger.GetLogger(ctx).Fatal(ctx, "Failed to get info from elasticsearch", zap.Error(err))
+		}
+		defer res.Body.Close()
+	}()
+
+	srv := service.NewService(db, *redisClient, producer, es)
 
 	grpcServer := grpc.NewServer(grpc.UnaryInterceptor(logger.Interceptor))
 	pb.RegisterOrderServiceServer(grpcServer, srv)

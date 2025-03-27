@@ -2,6 +2,7 @@ package config
 
 import (
 	"github.com/ilyakaznacheev/cleanenv"
+	"lyceum/pkg/kafka"
 	"lyceum/pkg/postgres"
 	"lyceum/pkg/redis"
 )
@@ -9,6 +10,7 @@ import (
 type Config struct {
 	Postgres postgres.Config `yaml:"POSTGRES" env:"POSTGRES"`
 	Redis    redis.Config    `yaml:"REDIS" env:"REDIS"`
+	Kafka    kafka.Config    `yaml:"KAFKA" env:"KAFKA"`
 
 	GRPCPort    int    `yaml:"GRPC_PORT" env:"GRPC_PORT" env-default:"50051"`
 	GATEWAYPort string `yaml:"GRPC_GATEWAY_PORT" env:"GRPC_GATEWAY_PORT" env-default:"8081"`
