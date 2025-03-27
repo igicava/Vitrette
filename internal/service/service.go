@@ -128,6 +128,10 @@ func (s *Service) DeleteOrder(ctx context.Context, req *pb.DeleteOrderRequest) (
 		logger.GetLogger(ctx).Error(ctx, "DeleteOrder failed: %v", zap.Error(err))
 		return nil, err
 	}
+	err = s.Redis.Del(ctx, req.Id).Err()
+	if err != nil {
+		logger.GetLogger(ctx).Error(ctx, "DeleteOrder from cache failed", zap.Error(err))
+	}
 	return &pb.DeleteOrderResponse{Success: true}, nil
 }
 
