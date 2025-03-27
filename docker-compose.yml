@@ -30,6 +30,10 @@ services:
       - ES_JAVA_OPTS=-Xms1g -Xmx1g
     networks:
       - orders_network
+    healthcheck:
+      interval: 10s
+      retries: 80
+      test: curl --write-out 'HTTP %{http_code}' --fail --silent --output /dev/null http://localhost:${ELASTICSEARCH_PORT}/
     env_file:
       - .env
 
@@ -152,6 +156,8 @@ services:
         condition: service_healthy
       kafka:
         condition: service_healthy
+      elasticsearch:
+        condition: service_healthy
     networks:
       - orders_network
     env_file:
@@ -172,6 +178,8 @@ services:
       redis:
         condition: service_healthy
       kafka:
+        condition: service_healthy
+      elasticsearch:
         condition: service_healthy
       orders1:
         condition: service_started
@@ -195,6 +203,8 @@ services:
       redis:
         condition: service_healthy
       kafka:
+        condition: service_healthy
+      elasticsearch:
         condition: service_healthy
       orders1:
         condition: service_started

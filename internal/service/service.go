@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/IBM/sarama"
+	"github.com/elastic/go-elasticsearch/v8"
 	"github.com/google/uuid"
 	"github.com/redis/go-redis/v9"
 	"go.uber.org/zap"
@@ -28,14 +29,16 @@ type Service struct {
 	DB            DataBaseInterface
 	Redis         *redis.Client
 	KafkaProducer sarama.SyncProducer
+	es            *elasticsearch.Client
 	StreamStart   chan os.Signal
 }
 
-func NewService(db DataBaseInterface, client redis.Client, producer sarama.SyncProducer) *Service {
+func NewService(db DataBaseInterface, client redis.Client, producer sarama.SyncProducer, es *elasticsearch.Client) *Service {
 	return &Service{
 		DB:            db,
 		Redis:         &client,
 		KafkaProducer: producer,
+		es:            es,
 		StreamStart:   make(chan os.Signal, 1),
 	}
 }
@@ -52,10 +55,15 @@ func (s *Service) CreateOrder(ctx context.Context, req *pb.CreateOrderRequest) (
 		logger.GetLogger(ctx).Error(ctx, "CreateOrder failed", zap.Error(err))
 		return nil, err
 	}
+	order, _ := json.Marshal(&pb.Order{
+		Id:       id,
+		Item:     req.Item,
+		Quantity: req.Quantity,
+	})
 	_, _, err = s.KafkaProducer.SendMessage(&sarama.ProducerMessage{
 		Topic: "orders",
 		Key:   sarama.StringEncoder(id),
-		Value: sarama.StringEncoder(req.Item),
+		Value: sarama.StringEncoder(order),
 	})
 	return &pb.CreateOrderResponse{Id: id}, nil
 }
@@ -64,6 +72,12 @@ func (s *Service) GetOrder(ctx context.Context, req *pb.GetOrderRequest) (*pb.Ge
 	str, err := s.Redis.Get(ctx, req.Id).Result()
 
 	if errors.Is(err, redis.Nil) {
+		esItem, err := s.es.Get("orders", req.Id)
+		if err != nil {
+			logger.GetLogger(ctx).Error(ctx, "GetOrder failed", zap.Error(err))
+			// return nil, err
+		}
+		fmt.Printf("%s", esItem)
 		item, err := s.DB.Get(ctx, req.Id)
 		if err != nil {
 			logger.GetLogger(ctx).Error(ctx, "GetOrder failed", zap.Error(err))
@@ -81,7 +95,7 @@ func (s *Service) GetOrder(ctx context.Context, req *pb.GetOrderRequest) (*pb.Ge
 		if err != nil {
 			logger.GetLogger(ctx).Error(ctx, "SetCacheOrder failed", zap.Error(err))
 		}
-
+		fmt.Println("Value from db!")
 		return &pb.GetOrderResponse{Order: order}, nil
 	}
 
