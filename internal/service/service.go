@@ -7,12 +7,14 @@ import (
 	"fmt"
 	"github.com/IBM/sarama"
 	"github.com/elastic/go-elasticsearch/v8"
+	"github.com/elastic/go-elasticsearch/v8/esapi"
 	"github.com/google/uuid"
 	"github.com/redis/go-redis/v9"
 	"go.uber.org/zap"
 	pb "lyceum/pkg/api"
 	"lyceum/pkg/logger"
 	"os"
+	"strings"
 	"time"
 )
 
@@ -65,6 +67,22 @@ func (s *Service) CreateOrder(ctx context.Context, req *pb.CreateOrderRequest) (
 		Key:   sarama.StringEncoder(id),
 		Value: sarama.StringEncoder(order),
 	})
+
+	if err != nil {
+		logger.GetLogger(ctx).Error(ctx, "CreateOrder failed", zap.Error(err))
+		return nil, err
+	}
+
+	res := esapi.IndexRequest{
+		Index:      "orders",
+		Body:       strings.NewReader(string(order)),
+		DocumentID: id,
+		Refresh:    "true",
+	}
+	_, err = res.Do(ctx, s.es)
+	if err != nil {
+		logger.GetLogger(ctx).Error(ctx, "CreateOrder failed in elastic", zap.Error(err))
+	}
 	return &pb.CreateOrderResponse{Id: id}, nil
 }
 
